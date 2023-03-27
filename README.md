@@ -35,3 +35,9 @@ To use the application, follow these steps:
 3. Click on login and upload your fingerprint to match 
 4. The application will display the results of the matching process, including any matches found in the database.
 
+## Examples
+### Homepage![Screenshot from 2023-03-27 12-47-29](https://user-images.githubusercontent.com/50315486/227875382-81eeb2b7-1aa6-4af7-8dbc-fc5485a33195.png)
+
+### Login ![Screenshot from 2023-03-27 12-47-47](https://user-images.githubusercontent.com/50315486/227875458-9125714f-51e3-4f15-8c3a-76082fe138bc.png)
+
+
