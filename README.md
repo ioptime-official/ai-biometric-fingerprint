@@ -22,6 +22,10 @@ python manage.py migrate
 ```sh
 python manage.py migrate appone
 ```
+Finally make the migrations
+```sh
+python manage.py makemigrations
+```
 Start the development server:
 ```sh
 python manage.py runserver
