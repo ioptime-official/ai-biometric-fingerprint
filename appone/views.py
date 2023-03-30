@@ -204,8 +204,8 @@ def FingerSerializer(request):
 
                 # If similarity ratio is above a threshold, return a match
                 if similarity_ratio > 0.97:
-                    data = {'message':'image already exist please chose different file','Image name':database_image_name}
-                    return JsonResponse(data)
+                    data = {"IsSuccess":False,'message':'image already exist please chose different file','Image name':database_image_name,"Username":database_image.name_text}
+                    return JsonResponse(data,status=409)
 
             # If no match was found, return a failure response
             serializer.save()
