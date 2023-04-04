@@ -1,0 +1,24 @@
+version: '3'
+
+services:
+  web:
+    build: .
+    # command: bash -c "python manage.py migrate && python manage.py migrate appone &&  python manage.py makemigrations &&  gunicorn --certfile=/etc/certs/localhost.crt --keyfile=/etc/certs/localhost.key assignment1.wsgi:application --bind 0.0.0.0:443"
+    container_name: finger_match
+    env_file:
+      - ./config/web/web-variables.env
+    volumes:
+      - ./code:/src
+      - ./config/nginx/certs/:/etc/certs
+    expose:
+      - "443"
+  nginx:
+    image: nginx:latest
+    container_name: ng
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./config/nginx/:/etc/nginx/conf.d
+    depends_on:
+      - web
