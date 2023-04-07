@@ -10,6 +10,11 @@ from .serializers import FingerprintSerializer, MatchSerializer
 import cv2
 import os
 import numpy as np
+import threading
+from concurrent.futures import ThreadPoolExecutor
+import concurrent.futures
+from functools import partial
+import time
 import io
 from django.http import HttpResponse
 import datetime
@@ -19,14 +24,15 @@ from rest_framework.response import Response
 from rest_framework import status
 
 
+import time
+
 def index(request):
+    start_time = time.time()
     if request.method == 'POST':
         form = RegistrationForm(request.POST, request.FILES)
         print("Before valid----------------------------")
         if form.is_valid():
             name_text = form.cleaned_data['name']
-        
-            print("------name---",name_text)
             # Check if the name already exists in the database
             existing_file = FileUpload.objects.filter(name_text=name_text).first()
             if existing_file:
@@ -36,7 +42,6 @@ def index(request):
                 form.add_error('name', message)
             else:
                 image = form.cleaned_data['image']
-                print("-----image---",image)
                 sample = cv2.imdecode(np.fromstring(image.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
                 database_images = FileUpload.objects.all()
                 for database_image in database_images:
@@ -44,18 +49,17 @@ def index(request):
                     # decode the database image and convert it to grayscale
                     fp_image  = cv2.imdecode(np.fromstring(database_image.image.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
 
-                    sift = cv2.SIFT_create()
-                    kp_1, desc_1 = sift.detectAndCompute(sample, None)
-                    kp_2, desc_2 = sift.detectAndCompute(fp_image, None)
+                    orb = cv2.ORB_create()
+                    kp_1, desc_1 = orb.detectAndCompute(sample, None)
+                    kp_2, desc_2 = orb.detectAndCompute(fp_image, None)
 
-                    index_params = dict(algorithm=0, trees=5)
-                    search_params = dict()
-                    flann = cv2.FlannBasedMatcher(index_params, search_params)
-                    matches = flann.knnMatch(desc_1, desc_2, k=2)
+
+                    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+                    matches = bf.match(desc_1,desc_2)
 
                     good_points = []
-                    for m, n in matches:
-                        if m.distance < 0.6*n.distance:
+                    for m in matches:
+                        if m.distance < 50:
                             good_points.append(m)
 
                     # Define how similar they are
@@ -75,7 +79,11 @@ def index(request):
                     name.save()
                     #JSON Response
                     data = {'message': 'Registered!', 'Username' : name_text}
-                    return JsonResponse(data)             
+                    return JsonResponse(data)      
+
+        end_time = time.time()
+        print(f"Time taken by index function: {end_time - start_time} seconds")
+
     else:
         form = RegistrationForm()
     return render(request, 'appone/index.html', {'form': form})
@@ -89,44 +97,45 @@ def match(request):
 
 #########################################THIS IS FOR MATCHING###############################################
 
+########################ORB#########################################
+import cv2
+import numpy as np
+from concurrent.futures import ThreadPoolExecutor
+from django.http import JsonResponse
+from django.shortcuts import render
+from .forms import LoginForm
+from .models import FileUpload
+import time
+
+
 def matching(request):
     if request.method == 'POST':
         form = LoginForm(request.POST, request.FILES)
         if form.is_valid():
-            # name_text = form.cleaned_data['name']
             image = form.cleaned_data['image']
 
             # Check if the name already exists in the database
             sample = cv2.imdecode(np.fromstring(image.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
 
             database_images = FileUpload.objects.all()
-            for database_image in database_images:
+
+            start_time = time.time()
+
+            def match_image(database_image):
                 database_image_name = database_image.name_text
                 # decode the database image and convert it to grayscale
                 fp_image  = cv2.imdecode(np.fromstring(database_image.image.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
 
-                # if sample.shape == fp_image.shape:
-                #     print("The images have same size and channels")
-                #     difference = cv2.subtract(sample, fp_image)
-                    # b, g, r = cv2.split(difference)
-                    # if cv2.countNonZero(b) == 0 and cv2.countNonZero(g) == 0 and cv2.countNonZero(r) == 0:
-                    #     print("The images are completely Equal")
-                    # else:
-                    #     print("The images are NOT equal")
+                orb = cv2.ORB_create()
+                kp_1, desc_1 = orb.detectAndCompute(sample, None)
+                kp_2, desc_2 = orb.detectAndCompute(fp_image, None)
 
-                # sift = cv2.xfeatures2d.SIFT_create()
-                sift = cv2.SIFT_create()
-                kp_1, desc_1 = sift.detectAndCompute(sample, None)
-                kp_2, desc_2 = sift.detectAndCompute(fp_image, None)
-
-                index_params = dict(algorithm=0, trees=5)
-                search_params = dict()
-                flann = cv2.FlannBasedMatcher(index_params, search_params)
-                matches = flann.knnMatch(desc_1, desc_2, k=2)
+                bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+                matches = bf.match(desc_1,desc_2)
 
                 good_points = []
-                for m, n in matches:
-                    if m.distance < 0.6*n.distance:
+                for m in matches:
+                    if m.distance < 50:
                         good_points.append(m)
 
                 # Define how similar they are
@@ -136,21 +145,33 @@ def matching(request):
                 else:
                     number_keypoints = len(kp_2)
                 if (len(good_points) / number_keypoints)>0.97:
-                    # print("Keypoints 1ST Image: " + str(len(kp_1)))
-                    # print("Keypoints 2ND Image: " + str(len(kp_2)))
-                    # print("GOOD Matches:", len(good_points))
-                    # print("How good it's the match: ", len(good_points) / number_keypoints * 100)
                     print("username---->>",database_image.name_text)
                     
                     data = {'message': 'Matched!', 'Username' : database_image.name_text}
-                    return JsonResponse(data)      
+                    return data      
 
-            else:
-                data = {'message': 'Not Matched!'}
-                return JsonResponse(data)  
+                else:
+                    data = {'message': 'Not Matched!'}
+                    return data 
+
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                results = list(executor.map(match_image, database_images))
+
+            end_time = time.time()
+            total_processing_time = end_time - start_time
+            print(f"Total processing time: {total_processing_time:.2f} seconds")
+
+            for result in results:
+                if result['message'] == 'Matched!':
+                    return JsonResponse(result)
+            
+            return JsonResponse({'message': 'Not Matched!'})
+            
     else:
         form = LoginForm()
     return render(request, 'appone/matching.html', {'form': form})
+
+
 
 ########################################################################API#########################################################################
 
@@ -178,21 +199,19 @@ def FingerSerializer(request):
                 # decode the database image and convert it to grayscale
                 fp_image  = cv2.imdecode(np.fromstring(database_image.image.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
 
-                # Compute SIFT keypoints and descriptors for both images
-                sift = cv2.SIFT_create()
-                kp_1, desc_1 = sift.detectAndCompute(sample, None)
-                kp_2, desc_2 = sift.detectAndCompute(fp_image, None)
+                # Compute ORB keypoints and descriptors for both images
+                orb = cv2.ORB_create()
+                kp_1, desc_1 = orb.detectAndCompute(sample, None)
+                kp_2, desc_2 = orb.detectAndCompute(fp_image, None)
 
-                # Use FLANN matcher to find matches between descriptors
-                index_params = dict(algorithm=0, trees=5)
-                search_params = dict()
-                flann = cv2.FlannBasedMatcher(index_params, search_params)
-                matches = flann.knnMatch(desc_1, desc_2, k=2)
+                # Use BF MATCHER matcher to find matches between descriptors
+                bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+                matches = bf.match(desc_1,desc_2)
 
                 # Filter matches using the Lowe's ratio test
                 good_points = []
-                for m, n in matches:
-                    if m.distance < 0.6 * n.distance:
+                for m in matches:
+                    if m.distance < 50:
                         good_points.append(m)
 
                 # Compute the ratio of good matches to total keypoints
@@ -234,43 +253,52 @@ def finger_serializer(request):
             sample = cv2.imdecode(np.fromstring(image.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
 
             database_images = FileUpload.objects.all()
-            for database_image in database_images:
+
+            def match_image(database_image):
+
                 database_image_name = database_image.name_text
                 # decode the database image and convert it to grayscale
                 fp_image  = cv2.imdecode(np.fromstring(database_image.image.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
 
-                # Compute SIFT keypoints and descriptors for both images
-                sift = cv2.SIFT_create()
-                kp_1, desc_1 = sift.detectAndCompute(sample, None)
-                kp_2, desc_2 = sift.detectAndCompute(fp_image, None)
+                orb = cv2.ORB_create()
+                kp_1, desc_1 = orb.detectAndCompute(sample, None)
+                kp_2, desc_2 = orb.detectAndCompute(fp_image, None)
 
-                # Use FLANN matcher to find matches between descriptors
-                index_params = dict(algorithm=0, trees=5)
-                search_params = dict()
-                flann = cv2.FlannBasedMatcher(index_params, search_params)
-                matches = flann.knnMatch(desc_1, desc_2, k=2)
+                bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+                matches = bf.match(desc_1,desc_2)
 
-                # Filter matches using the Lowe's ratio test
                 good_points = []
-                for m, n in matches:
-                    if m.distance < 0.6 * n.distance:
+                for m in matches:
+                    if m.distance < 50:
                         good_points.append(m)
 
-                # Compute the ratio of good matches to total keypoints
-                number_keypoints = min(len(kp_1), len(kp_2))
-                if number_keypoints > 0:
-                    similarity_ratio = len(good_points) / number_keypoints
+                # Define how similar they are
+                number_keypoints = 0
+                if len(kp_1) <= len(kp_2):
+                    number_keypoints = len(kp_1)
                 else:
-                    similarity_ratio = 0
+                    number_keypoints = len(kp_2)
+                if (len(good_points) / number_keypoints)>0.97:
+                    print("username---->>",database_image.name_text)
+                    
+                    data = {'message': 'Matched!', 'Username' : database_image.name_text}
+                    return data      
 
-                # If similarity ratio is above a threshold, return a match
-                if similarity_ratio > 0.97:
-                    data = {'message': 'Matched!', 'Username': database_image.name_text}
-                    return JsonResponse(data)
+                else:
+                    data = {'message': 'Not Matched!'}
+                    return data 
 
-            # If no match was found, return a failure response
-            data = {'message': 'No match found.'}
-            return JsonResponse(data)
+            num_cores = os.cpu_count()
+            print(f"Number of available threads: {num_cores}")
+
+            with ThreadPoolExecutor(max_workers=num_cores) as executor:
+                results = list(executor.map(match_image, database_images))
+
+            for result in results:
+                if result['message'] == 'Matched!':
+                    return JsonResponse(result)
+            
+            return JsonResponse({'message': 'Not Matched!'})
 
         else:
             data = {'message': 'Invalid form data.'}
