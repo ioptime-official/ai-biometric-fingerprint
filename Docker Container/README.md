@@ -4,3 +4,5 @@ Sample code [blog post on deploying Django in Docker with Nginx](https://medium.
 
 
 https://github.com/soumilshah1995/Deploy-Docker-Container-on-AWS
+
+Public Server IP: https://3.144.253.41/
