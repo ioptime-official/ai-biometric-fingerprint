@@ -22,6 +22,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view 
 from rest_framework.response import Response
 from rest_framework import status
+import logging
 
 
 import time
@@ -59,7 +60,7 @@ def index(request):
 
                     good_points = []
                     for m in matches:
-                        if m.distance < 50:
+                        if m.distance < 20:
                             good_points.append(m)
 
                     # Define how similar they are
@@ -68,7 +69,7 @@ def index(request):
                         number_keypoints = len(kp_1)
                     else:
                         number_keypoints = len(kp_2)
-                    if (len(good_points) / number_keypoints)>0.97:
+                    if (len(good_points) / number_keypoints)>0.30:
                         # If the uploaded image matches with an image in the database, create a message to display to the user
                         message = f"The fingerprint '{image.name}' matches with the fingerprint of '{database_image_name}'. Please enter a different fingerprint."
                         # Render the form with the message
@@ -97,6 +98,7 @@ def match(request):
 
 #########################################THIS IS FOR MATCHING###############################################
 
+
 ########################ORB#########################################
 import cv2
 import numpy as np
@@ -116,43 +118,115 @@ def matching(request):
 
             # Check if the name already exists in the database
             sample = cv2.imdecode(np.fromstring(image.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
+            name = UploadMatch(image=image)
+            name.save()
 
             database_images = FileUpload.objects.all()
 
             start_time = time.time()
+
+            # def match_image(database_image):
+            #     database_image_name = database_image.name_text
+            #     # decode the database image and convert it to grayscale
+            #     fp_image  = cv2.imdecode(np.fromstring(database_image.image.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
+
+            #     orb = cv2.ORB_create()
+            #     kp_1, desc_1 = orb.detectAndCompute(sample, None)
+            #     kp_2, desc_2 = orb.detectAndCompute(fp_image, None)
+
+            #     bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+            #     matches = bf.match(desc_1,desc_2)
+
+            #     good_points = []
+            #     for m in matches:
+            #         if m.distance < 50:
+            #             good_points.append(m)
+
+            #     # Define how similar they are
+            #     number_keypoints = 0
+            #     if len(kp_1) <= len(kp_2):
+            #         number_keypoints = len(kp_1)
+            #     else:
+            #         number_keypoints = len(kp_2)
+            #     if (len(good_points) / number_keypoints)>0.60:
+            #         print("username---->>",database_image.name_text)
+                    
+            #         data = {'message': 'Matched!', 'Username' : database_image.name_text}
+            #         return data      
+
+            #     else:
+            #         data = {'message': 'Not Matched!'}
+            #         return data 
 
             def match_image(database_image):
                 database_image_name = database_image.name_text
                 # decode the database image and convert it to grayscale
                 fp_image  = cv2.imdecode(np.fromstring(database_image.image.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
 
-                orb = cv2.ORB_create()
-                kp_1, desc_1 = orb.detectAndCompute(sample, None)
-                kp_2, desc_2 = orb.detectAndCompute(fp_image, None)
+                # create AKAZE object
+                akaze = cv2.AKAZE_create()
 
+                # detect and compute keypoints and descriptors using AKAZE
+                kp_1, desc_1 = akaze.detectAndCompute(sample, None)
+                kp_2, desc_2 = akaze.detectAndCompute(fp_image, None)
+
+                # create BFMatcher object and match descriptors
                 bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
                 matches = bf.match(desc_1,desc_2)
 
+                # filter good matches based on distance
                 good_points = []
                 for m in matches:
-                    if m.distance < 50:
+                    if m.distance < 90:
                         good_points.append(m)
 
-                # Define how similar they are
-                number_keypoints = 0
-                if len(kp_1) <= len(kp_2):
-                    number_keypoints = len(kp_1)
-                else:
-                    number_keypoints = len(kp_2)
-                if (len(good_points) / number_keypoints)>0.97:
+                # calculate similarity score and return result
+                number_keypoints = min(len(kp_1), len(kp_2))
+                similarity_score = len(good_points) / number_keypoints
+                print("similarity ratio------------------------->>>>>>>>>>>>", similarity_score)
+                if similarity_score > 0.10:
                     print("username---->>",database_image.name_text)
-                    
                     data = {'message': 'Matched!', 'Username' : database_image.name_text}
-                    return data      
-
                 else:
                     data = {'message': 'Not Matched!'}
-                    return data 
+                return data
+
+            # def match_image(database_image):
+            #     database_image_name = database_image.name_text
+            #     # decode the database image and convert it to grayscale
+            #     fp_image = cv2.imdecode(np.fromstring(database_image.image.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
+
+            #     # create SIFT object
+            #     # sift = cv2.xfeatures2d.SIFT_create()
+            #     sift = cv2.xfeatures2d.SIFT_create()
+
+
+            #     # detect and compute keypoints and descriptors using SIFT
+            #     kp_1, desc_1 = sift.detectAndCompute(sample, None)
+            #     kp_2, desc_2 = sift.detectAndCompute(fp_image, None)
+
+            #     # create BFMatcher object and match descriptors
+            #     bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
+            #     matches = bf.match(desc_1, desc_2)
+
+            #     # filter good matches based on distance
+            #     good_points = []
+            #     for m in matches:
+            #         if m.distance < 90:
+            #             good_points.append(m)
+
+            #     # calculate similarity score and return result
+            #     number_keypoints = min(len(kp_1), len(kp_2))
+            #     similarity_score = len(good_points) / number_keypoints
+            #     print("similarity ratio------------------------->>>>>>>>>>>>", similarity_score)
+            #     if similarity_score > 0.10:
+            #         print("username---->>",database_image.name_text)
+            #         data = {'message': 'Matched!', 'Username' : database_image.name_text}
+            #     else:
+            #         data = {'message': 'Not Matched!'}
+            #     return data
+
+
 
             with ThreadPoolExecutor(max_workers=1) as executor:
                 results = list(executor.map(match_image, database_images))
@@ -166,6 +240,7 @@ def matching(request):
                     return JsonResponse(result)
             
             return JsonResponse({'message': 'Not Matched!'})
+
             
     else:
         form = LoginForm()
@@ -177,62 +252,220 @@ def matching(request):
 
 #Built APIs 
 
-#API for Getting All User with their fingerprints + Adding new User
-@api_view(['GET','POST'])
+# API for Getting All User with their fingerprints + Adding new User
+    # @api_view(['GET','POST'])
+    # def FingerSerializer(request):
+    #     if request.method == 'GET':
+    #         temp = FileUpload.objects.all()
+    #         serializer = FingerprintSerializer(temp, many=True)
+    #         return JsonResponse({'FingerprintS':serializer.data,"STATUS":'Pass'})
+    # # before adding new user check is same file exist or not
+    #     if request.method == 'POST':
+    #         serializer = FingerprintSerializer(data=request.data)
+    #         if serializer.is_valid():
+    #             image = serializer.validated_data['image']
+
+    #             # Check if the name already exists in the database
+    #             sample = cv2.imdecode(np.fromstring(image.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
+
+    #             database_images = FileUpload.objects.all()
+    #             for database_image in database_images:
+    #                 database_image_name = database_image.image.name
+    #                 # decode the database image and convert it to grayscale
+    #                 fp_image  = cv2.imdecode(np.fromstring(database_image.image.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
+
+    #                 # Compute ORB keypoints and descriptors for both images
+    #                 orb = cv2.ORB_create()
+    #                 kp_1, desc_1 = orb.detectAndCompute(sample, None)
+    #                 kp_2, desc_2 = orb.detectAndCompute(fp_image, None)
+
+    #                 # Use BF MATCHER matcher to find matches between descriptors
+    #                 bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+    #                 matches = bf.match(desc_1,desc_2)
+
+    #                 # Filter matches using the Lowe's ratio test
+    #                 good_points = []
+    #                 for m in matches:
+    #                     if m.distance < 50:
+    #                         good_points.append(m)
+
+    #                 # Compute the ratio of good matches to total keypoints
+    #                 number_keypoints = min(len(kp_1), len(kp_2))
+    #                 if number_keypoints > 0:
+    #                     similarity_ratio = len(good_points) / number_keypoints
+    #                 else:
+    #                     similarity_ratio = 0
+
+    #                 print("similarity ratio------------------------->>>>>>>>>>>>", similarity_ratio)
+    #                 # If similarity ratio is above a threshold, return a match
+    #                 if similarity_ratio > 0.30:
+    #                     data = {"IsSuccess":False,'message':'image already exist please chose different file','Image name':database_image_name,"Username":database_image.name_text}
+    #                     return JsonResponse(data,status=409)
+
+
+    #             # If no match was found, return a failure response
+    #             serializer.save()
+    #             return Response(serializer.data , status=status.HTTP_201_CREATED)
+
+    #         else:
+    #             data = {'message': 'Invalid form data.'}
+#             return JsonResponse(data)
+
+
+
+@api_view(['GET', 'POST'])
 def FingerSerializer(request):
     if request.method == 'GET':
         temp = FileUpload.objects.all()
         serializer = FingerprintSerializer(temp, many=True)
-        return JsonResponse({'FingerprintS':serializer.data,"STATUS":'Pass'})
-# before adding new user check is same file exist or not
+        return JsonResponse({'FingerprintS':serializer.data, "STATUS":'Pass'})
+
     if request.method == 'POST':
         serializer = FingerprintSerializer(data=request.data)
         if serializer.is_valid():
-            image = serializer.validated_data['image']
-
+            # Get the username associated with the images
+            name_text = serializer.validated_data['name_text']
             # Check if the name already exists in the database
-            sample = cv2.imdecode(np.fromstring(image.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
+            existing_file = FileUpload.objects.filter(name_text=name_text).first()
+            if existing_file:
+                # If the name already exists, create a message to display to the user
+                message = f"The name '{name_text}' already exists with the image '{existing_file.image.name}'. Please enter a different name."
+                # Render the form with the message
+                data = {'message': 'name already exists.'}
+                return JsonResponse(data)
 
-            database_images = FileUpload.objects.all()
-            for database_image in database_images:
-                database_image_name = database_image.image.name
-                # decode the database image and convert it to grayscale
-                fp_image  = cv2.imdecode(np.fromstring(database_image.image.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
+            else:
+                # Check if all three images have been uploaded
+                images_uploaded = []
+                for i in range(3):
+                    image_field_name = f'image{i}'
+                    if image_field_name in request.FILES:
+                        images_uploaded.append(request.FILES[image_field_name])
+                    else:
+                        data = {"IsSuccess": False, 'message': 'Please upload all three images.'}
+                        return JsonResponse(data, status=400)
 
-                # Compute ORB keypoints and descriptors for both images
-                orb = cv2.ORB_create()
-                kp_1, desc_1 = orb.detectAndCompute(sample, None)
-                kp_2, desc_2 = orb.detectAndCompute(fp_image, None)
+                # Save the images for the new user
+                for i, image_file in enumerate(images_uploaded):
+                    sample = cv2.imdecode(np.fromstring(image_file.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
 
-                # Use BF MATCHER matcher to find matches between descriptors
-                bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-                matches = bf.match(desc_1,desc_2)
+                    # Check if the image already exists in the database
+                    database_images = FileUpload.objects.all()
+                    for database_image in database_images:
+                        database_image_name = database_image.image.name
+                        #fp_image = cv2.imdecode(np.fromstring(database_image.image.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
 
-                # Filter matches using the Lowe's ratio test
-                good_points = []
-                for m in matches:
-                    if m.distance < 50:
-                        good_points.append(m)
+                        # Compute ORB keypoints and descriptors for both images
+                        #orb = cv2.ORB_create()
+                        #kp_1, desc_1 = orb.detectAndCompute(sample, None)
+                        #kp_2, desc_2 = orb.detectAndCompute(fp_image, None)
 
-                # Compute the ratio of good matches to total keypoints
-                number_keypoints = min(len(kp_1), len(kp_2))
-                if number_keypoints > 0:
-                    similarity_ratio = len(good_points) / number_keypoints
-                else:
-                    similarity_ratio = 0
+                        # Use BF MATCHER matcher to find matches between descriptors
+                        #bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+                        #matches = bf.match(desc_1,desc_2)
 
-                # If similarity ratio is above a threshold, return a match
-                if similarity_ratio > 0.97:
-                    data = {"IsSuccess":False,'message':'image already exist please chose different file','Image name':database_image_name,"Username":database_image.name_text}
-                    return JsonResponse(data,status=409)
+                        # Filter matches using the Lowe's ratio test
+                        #good_points = []
+                        #for m in matches:
+                        #    if m.distance < 50:
+                        #        good_points.append(m)
 
-            # If no match was found, return a failure response
-            serializer.save()
-            return Response(serializer.data , status=status.HTTP_201_CREATED)
+                        # Compute the ratio of good matches to total keypoints
+                        #number_keypoints = min(len(kp_1), len(kp_2))
+                        #if number_keypoints > 0:
+                        #    similarity_ratio = len(good_points) / number_keypoints
+                        #else:
+                        #    similarity_ratio = 0
 
+                        #print("similarity ratio------------------------->>>>>>>>>>>>", similarity_ratio)
+                        # If similarity ratio is above a threshold, return a match
+                        #if similarity_ratio > 0.30:
+                        #    data = {"IsSuccess": False, 'message': f'image {i} already exists for user {database_image_name}', "Image name": database_image_name}
+                        #    return JsonResponse(data, status=409)
+
+                    # Save the image to the database
+                    FileUpload.objects.create(image=image_file, name_text=name_text)
+
+                data = {'name_text': name_text, 'image': " "}
+                return JsonResponse(data)
         else:
             data = {'message': 'Invalid form data.'}
             return JsonResponse(data)
+
+
+# @api_view(['GET', 'POST'])
+# def FingerSerializer(request):
+#     if request.method == 'GET':
+#         temp = FileUpload.objects.all(
+#         serializer = FingerprintSerializer(temp, many=True)
+#         return JsonResponse({'FingerprintS':serializer.data, "STATUS":'Pass'})
+
+#     if request.method == 'POST':
+#         serializer = FingerprintSerializer(data=request.data)
+#         if serializer.is_valid():
+#             # Get the username associated with the images
+#             name_text = serializer.validated_data['name_text']
+
+#             # Check if all three images have been uploaded
+#             images_uploaded = []
+#             for i in range(3):
+#                 image_field_name = f'image{i}'
+#                 if image_field_name in request.FILES:
+#                     images_uploaded.append(request.FILES[image_field_name])
+#                 else:
+#                     data = {"IsSuccess": False, 'message': 'Please upload all three images.'}
+#                     return JsonResponse(data, status=400)
+
+#             # Save the images for the new user
+#             saved_image = None
+#             for i, image_file in enumerate(images_uploaded):
+#                 sample = cv2.imdecode(np.fromstring(image_file.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
+
+#                 # Check if the image already exists in the database
+#                 database_images = FileUpload.objects.all()
+#                 for database_image in database_images:
+#                     database_image_name = database_image.image.name
+#                     fp_image = cv2.imdecode(np.fromstring(database_image.image.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
+
+#                     # Compute ORB keypoints and descriptors for both images
+#                     orb = cv2.ORB_create()
+#                     kp_1, desc_1 = orb.detectAndCompute(sample, None)
+#                     kp_2, desc_2 = orb.detectAndCompute(fp_image, None)
+
+#                     # Use BF MATCHER matcher to find matches between descriptors
+#                     bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+#                     matches = bf.match(desc_1,desc_2)
+
+#                     # Filter matches using the Lowe's ratio test
+#                     good_points = []
+#                     for m in matches:
+#                         if m.distance < 50:
+#                             good_points.append(m)
+
+#                     # Compute the ratio of good matches to total keypoints
+#                     number_keypoints = min(len(kp_1), len(kp_2))
+#                     if number_keypoints > 0:
+#                         similarity_ratio = len(good_points) / number_keypoints
+#                     else:
+#                         similarity_ratio = 0
+
+#                     print("similarity ratio------------------------->>>>>>>>>>>>", similarity_ratio)
+#                     # If similarity ratio is above a threshold, return a match
+#                     if similarity_ratio > 0.30:
+#                         data = {"IsSuccess": False, 'message': f'image {i} already exists for user {database_image_name}', "Image name": database_image_name}
+#                         return JsonResponse(data, status=409)
+
+#                 # Save the image to the database and update saved_image
+#                 saved_image = FileUpload.objects.create(image=image_file, name_text=name_text)
+#                 break  # Exit loop after saving first image
+
+#             # Return the saved image in the response
+#             data = {'name_text': saved_image.name_text, 'image': saved_image.image.url}
+#             return JsonResponse(data)
+#         else:
+#             data = {'message': 'Invalid form data.'}
+#             return JsonResponse(data)
+
 
 #API for Matching Fingerprints
 @api_view(['GET', 'POST'])
@@ -251,42 +484,57 @@ def finger_serializer(request):
 
             # Check if the name already exists in the database
             sample = cv2.imdecode(np.fromstring(image.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
+            name = UploadMatch(image=image)
+            name.save()
+
 
             database_images = FileUpload.objects.all()
 
-            def match_image(database_image):
 
+            logging.basicConfig(filename='example.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+            def match_image(database_image):
                 database_image_name = database_image.name_text
                 # decode the database image and convert it to grayscale
                 fp_image  = cv2.imdecode(np.fromstring(database_image.image.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
 
-                orb = cv2.ORB_create()
-                kp_1, desc_1 = orb.detectAndCompute(sample, None)
-                kp_2, desc_2 = orb.detectAndCompute(fp_image, None)
+                # create AKAZE object
+                akaze = cv2.AKAZE_create()
 
+                # detect and compute keypoints and descriptors using AKAZE
+                kp_1, desc_1 = akaze.detectAndCompute(sample, None)
+                kp_2, desc_2 = akaze.detectAndCompute(fp_image, None)
+
+                # create BFMatcher object and match descriptors
                 bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
                 matches = bf.match(desc_1,desc_2)
 
+                # filter good matches based on distance
                 good_points = []
                 for m in matches:
-                    if m.distance < 50:
+                    if m.distance < 90:
                         good_points.append(m)
 
-                # Define how similar they are
-                number_keypoints = 0
-                if len(kp_1) <= len(kp_2):
-                    number_keypoints = len(kp_1)
-                else:
-                    number_keypoints = len(kp_2)
-                if (len(good_points) / number_keypoints)>0.97:
-                    print("username---->>",database_image.name_text)
-                    
-                    data = {'message': 'Matched!', 'Username' : database_image.name_text}
-                    return data      
+                # calculate similarity score and log the result
+                number_keypoints = min(len(kp_1), len(kp_2))
+                similarity_score = len(good_points) / number_keypoints
+                logging.info(f"Similarity score for {database_image_name}: {similarity_score}")
 
+                # return the result
+                if similarity_score > 0.10:
+                    logging.info(f"Matched username: {database_image.name_text}")
+                    data = {'message': 'Matched!', 'Username' : database_image.name_text}
                 else:
                     data = {'message': 'Not Matched!'}
-                    return data 
+
+                # log that the function is done
+                logging.info(f"Finished matching for {database_image_name}")
+
+
+                return data
+            logging.info(f"END LOG-------------------------------------------------------------")
+
+
 
             num_cores = os.cpu_count()
             print(f"Number of available threads: {num_cores}")
@@ -304,16 +552,34 @@ def finger_serializer(request):
             data = {'message': 'Invalid form data.'}
             return JsonResponse(data)
 
-#API fro deleting User by Username
+# #API fro deleting User by Username
+# @api_view(['GET'])
+# def delete_fp(request, name):
+
+#     try:
+#         fingerprint =  FileUpload.objects.get(name_text=name)
+#     except FileUpload.DoesNotExist:
+#         return Response(status=status.HTTP_404_NOT_FOUND)
+
+#     if request.method == 'GET':
+#         fingerprint.delete()
+#         data = {'message': 'Delete Sucessfuly'}
+#         return JsonResponse(data)
+# API for deleting all images of a user by username
 @api_view(['GET'])
 def delete_fp(request, name):
-
     try:
-        fingerprint =  FileUpload.objects.get(name_text=name)
+        fingerprints = FileUpload.objects.filter(name_text=name)
     except FileUpload.DoesNotExist:
-        return Response(status=status.HTTP_404_NOT_FOUND)
+        data = {'message': 'User Not found'}
+        return Response(data, status=status.HTTP_404_NOT_FOUND)
 
     if request.method == 'GET':
-        fingerprint.delete()
-        data = {'message': 'Delete Sucessfuly'}
-        return JsonResponse(data)
+        num_deleted, _ = fingerprints.delete()
+        if num_deleted > 0:
+            data = {'message': f"All {num_deleted} images for user {name} deleted successfully"}
+            return JsonResponse(data)
+        else:
+            data = {'message': f"No images found for user {name}"}
+            return JsonResponse(data)
+
