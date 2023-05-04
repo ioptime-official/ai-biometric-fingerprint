@@ -10,7 +10,22 @@ class FileUpload(models.Model):
     def __str__(self):
         return self.name_text
 # this is for matching user
+import os
+from datetime import datetime
+
+def get_upload_path(instance, filename):
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename, extension = os.path.splitext(filename)
+    return 'file1/{}_{}{}'.format(timestamp, filename, extension)
+
 class UploadMatch(models.Model):
-    image = models.ImageField(upload_to='file1/', null=True, blank=True)
+    image = models.ImageField(upload_to=get_upload_path, null=True, blank=True)
+    
     def __str__(self):
-        return self.image
+        return self.image.name
+
+
+# class UploadMatch(models.Model):
+#     image = models.ImageField(upload_to='file1/', null=True, blank=True)
+#     def __str__(self):
+#         return self.image.name

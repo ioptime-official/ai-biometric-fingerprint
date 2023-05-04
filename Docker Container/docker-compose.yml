@@ -12,12 +12,13 @@ services:
       - ./config/nginx/certs/:/etc/certs
     expose:
       - "443"
+      - "8080"
   nginx:
     image: nginx:latest
     container_name: ng
     ports:
       - "443:443"
-      - "80:80"
+      - "8080:8080"
     volumes:
       - ./config/nginx/:/etc/nginx/conf.d
     depends_on:
