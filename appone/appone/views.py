@@ -186,7 +186,7 @@ def matching(request):
                 print("similarity ratio------------------------->>>>>>>>>>>>", similarity_score)
                 if similarity_score > 0.10:
                     print("username---->>",database_image.name_text)
-                    data = {'message': 'Matched!', 'Username' : database_image.name_text}
+                    data = {'message': 'User Matched!', 'Username' : database_image.name_text}
                 else:
                     data = {'message': 'Not Matched!'}
                 return data
@@ -239,7 +239,7 @@ def matching(request):
                 if result['message'] == 'Matched!':
                     return JsonResponse(result)
             
-            return JsonResponse({'message': 'Not Matched!'})
+            return JsonResponse({'message': 'Not Matched'})
 
             
     else:

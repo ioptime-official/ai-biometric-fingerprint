@@ -1,4 +1,3 @@
-
 {% load static %}
 <!DOCTYPE html>
 <html lang="en">
@@ -255,39 +254,20 @@
 <body>
     <div id="div_one" align="center">
         <img src="{% static 'images/icon.png' %}" alt="">
+        <!-- <button onclick="window.location.href='http://127.0.0.1:8000/match';">Go to Registration page </button> -->
+        <button onclick="window.location.href='https://3.144.253.41/matching';">Login</button>
+     
+  
         <p id="para"><b> UPLOAD FILES TO CHECK MATCH </b></p>
         <div class="form" align="center">
-
-   <button onclick="window.location.href='http://127.0.0.1:8000';">Register </button>
-           <h1>Welcome to the match image page</h1>
-<form method="post" enctype="multipart/form-data">
+           <h1>Welcome to the Homepage</h1>
+  <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
     {{ form.as_p }}
-    <button type="submit">Submit</button>
-</form>
+    <button type="submit">Register</button>
+  </form>
         </div>
     </div>
 
 </body>
 </html>
-
-<!-- <!DOCTYPE html>
-{% load static %}
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>matches</title>
- 
-</head>
-<body>
-    <a href="http://127.0.0.1:8000/"> this is home
-    </a>
-    <h1>Upload Successful!</h1>
-    <p>Your image has been uploaded:</p>
-
-
-
-</body>
-</html> -->
