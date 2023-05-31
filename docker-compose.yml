@@ -1,0 +1,44 @@
+version: '3'
+
+services:
+  web:
+    build: .
+    command: bash -c "python manage.py migrate && python manage.py migrate appone &&  python manage.py makemigrations &&  gunicorn --certfile=/etc/certs/localhost.crt --keyfile=/etc/certs/localhost.key assignment1.wsgi:application --bind 0.0.0.0:443"
+    container_name: finger_match
+    env_file:
+      - ./config/web/web-variables.env
+      - ./.env.prod
+    volumes:
+      - static_volume:/home/app/web/staticfiles
+      - media_volume:/home/app/web/mediafiles
+      - ./config/nginx/certs/:/etc/certs
+    expose:
+      - "443"
+      - "8080"      
+    depends_on:
+      - db
+  db:
+    container_name: db_container
+    image: postgres:12.8-buster
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    env_file:
+      - ./.env.prod.db
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    ports:
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - static_volume:/home/app/web/staticfiles
+      - media_volume:/home/app/web/mediafiles
+      - ./config/nginx/:/etc/nginx/conf.d
+    depends_on:
+      - web
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:
