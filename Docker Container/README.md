@@ -1,5 +1,8 @@
 # Django Fingerprint Matching Docker EC2 Instance Deployment
 
+![Artboard 1](https://github.com/ioptime-official/ai-biometric-fingerprint/assets/50315486/e584fd21-4739-4621-8a4c-6c059dbfef08)
+
+
 ## Project Overview
 The  Fingerprint  Authentication  System  for  user  identification  and  verification.  This  project  leverages 
 OpenCV,  AKAZE  algorithm,  Django,  and  Docker  to  create  a  reliable  fingerprint  scanner  that  captures 
